@@ -9,9 +9,23 @@
         "activityBar.foreground": "#ffffff"
     },
     "cSpell.words": [
+        "argmin",
         "Clelland",
+        "dtype",
+        "elif",
         "explainability",
+        "intp",
+        "ints",
+        "itertools",
+        "lbfgs",
+        "ndarray",
+        "numpy",
+        "reshapable",
         "Rumelhart",
-        "sprach"
+        "scikit",
+        "sklearn",
+        "sprach",
+        "thresholded",
+        "tolist"
     ]
 }
