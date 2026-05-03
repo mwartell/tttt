@@ -1,0 +1,17 @@
+{
+    "workbench.colorCustomizations": {
+        "activityBar.activeBackground": "#8c6ccd",
+        "activityBar.background": "#7c58c6",
+        "titleBar.activeBackground": "#7c58c6",
+        "titleBar.inactiveBackground": "#7c58c6a4",
+        "titleBar.activeForeground": "#ffffff",
+        "titleBar.inactiveForeground": "#ffffff",
+        "activityBar.foreground": "#ffffff"
+    },
+    "cSpell.words": [
+        "Clelland",
+        "explainability",
+        "Rumelhart",
+        "sprach"
+    ]
+}
