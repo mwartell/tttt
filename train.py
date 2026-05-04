@@ -1,25 +1,30 @@
-"""Train the tttt MLP on data/training.yaml and save the model.
+"""Train the tttt MLP on data/training.tsv and save the model.
 
 Run with:  uv run python train.py
 """
 
-import yaml
+import csv
+
 import joblib
 import numpy as np
 from sklearn.neural_network import MLPClassifier
 
-from board import str_to_board, to_features, to_target, O
+from board import O, str_to_board, to_features, to_target
 
-DATA_FILE = "data/training.yaml"
+DATA_FILE = "data/training.tsv"
 MODEL_FILE = "data/model.joblib"
 
 
 def load_training_data(path: str) -> tuple[np.ndarray, np.ndarray]:
-    with open(path) as fh:
-        records = yaml.safe_load(fh)["training"]
+    with open(path, newline="") as fh:
+        records = [
+            r
+            for r in csv.DictReader(fh, delimiter="\t")
+            if int(r["best_move"]) >= 0  # skip full-board draws
+        ]
 
     X_feat = np.array([to_features(str_to_board(r["board"])) for r in records])
-    y_target = np.array([to_target(r["best_move"], piece=O) for r in records])
+    y_target = np.array([to_target(int(r["best_move"]), piece=O) for r in records])
     return X_feat, y_target
 
 

@@ -1,7 +1,6 @@
 """Core board representation, symmetry, and minimax for tttt."""
 
 import numpy as np
-from itertools import product as iproduct
 
 EMPTY, X, O = np.int8(0), np.int8(1), np.int8(2)
 
@@ -44,9 +43,9 @@ def is_won(board: np.ndarray, piece: np.int8) -> bool:
 
 
 def canonical(board: np.ndarray) -> tuple[np.ndarray, int]:
-    """Return (lexically-smallest equivalent board, symmetry index used)."""
+    """Return (lexically-greatest equivalent board, symmetry index used)."""
     variants = [board[perm] for perm in SYMMETRIES]
-    idx = min(range(8), key=lambda i: tuple(variants[i]))
+    idx = max(range(8), key=lambda i: tuple(variants[i]))
     return variants[idx].copy(), idx
 
 
@@ -107,21 +106,29 @@ def minimax(board: np.ndarray, x_to_move: bool) -> tuple[int, int]:
 
 
 def generate_o_to_move() -> list[np.ndarray]:
-    """All distinct canonical non-terminal boards where O moves next
-    (X has made one more move than O, neither has won yet)."""
+    """All distinct canonical non-terminal boards where O moves next,
+    found via recursive game-tree descent from the empty board."""
     seen: set[tuple] = set()
     results: list[np.ndarray] = []
-    for n_x in range(1, 6):  # X can have 1–5 pieces when it's O's turn
-        n_o = n_x - 1
-        for cells in iproduct(range(3), repeat=9):
-            board = np.array(cells, dtype=np.int8)
-            if np.sum(board == X) != n_x or np.sum(board == O) != n_o:
-                continue
-            if is_won(board, X) or is_won(board, O):
-                continue
-            c, _ = canonical(board)
-            key = tuple(c)
-            if key not in seen:
-                seen.add(key)
-                results.append(c)
+
+    def recurse(board: np.ndarray, x_to_move: bool) -> None:
+        if x_to_move:
+            for move in np.where(board == EMPTY)[0]:
+                board[move] = X
+                if not is_won(board, X):
+                    c, _ = canonical(board)
+                    key = tuple(c)
+                    if key not in seen:
+                        seen.add(key)
+                        results.append(c)
+                    recurse(board, x_to_move=False)
+                board[move] = EMPTY
+        else:
+            for move in np.where(board == EMPTY)[0]:
+                board[move] = O
+                if not is_won(board, O):
+                    recurse(board, x_to_move=True)
+                board[move] = EMPTY
+
+    recurse(empty_board(), x_to_move=True)
     return results

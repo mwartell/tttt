@@ -3,14 +3,19 @@
 Run with:  uv run python evaluate.py
 """
 
-import yaml
+import csv
+
 import joblib
 import numpy as np
 
-from board import str_to_board, to_features, board_to_str, O
+from board import O, str_to_board, to_features
 
-DATA_FILE = "data/training.yaml"
+DATA_FILE = "data/training.tsv"
 MODEL_FILE = "data/model.joblib"
+
+
+def display(board_str: str) -> str:
+    return f"{board_str[:3]}/{board_str[3:6]}/{board_str[6:]}"
 
 
 def decode_move(output_vec: np.ndarray, piece: np.int8 = O) -> int:
@@ -24,8 +29,12 @@ def main() -> None:
     model = joblib.load(MODEL_FILE)
     print(f"Loaded model from {MODEL_FILE}")
 
-    with open(DATA_FILE) as fh:
-        records = yaml.safe_load(fh)["training"]
+    with open(DATA_FILE, newline="") as fh:
+        records = [
+            {"board": r["board"], "best_move": int(r["best_move"])}
+            for r in csv.DictReader(fh, delimiter="\t")
+            if int(r["best_move"]) >= 0
+        ]
 
     X_feat = np.array([to_features(str_to_board(r["board"])) for r in records])
     predictions = model.predict(X_feat)
@@ -40,13 +49,11 @@ def main() -> None:
         if predicted_move == expected_move:
             correct += 1
         else:
-            wrong_examples.append(
-                {
-                    "board": record["display"],
-                    "expected": expected_move,
-                    "predicted": predicted_move,
-                }
-            )
+            wrong_examples.append({
+                "board": display(record["board"]),
+                "expected": expected_move,
+                "predicted": predicted_move,
+            })
 
     pct = 100 * correct / total
     print(f"\nAccuracy: {correct}/{total} ({pct:.1f}%)")

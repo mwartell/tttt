@@ -1,0 +1,14 @@
+---
+date: 2026-05-03
+title: x corner move
+current_head: 8f734fa
+agent: "Claude Sonnet 4.6"
+session_type: exploration
+topics: [system-design, architecture, tttt, planning]
+---
+
+# prompt 1: X wants to win
+
+I think I have figured out how I wound up with so few boards in my 1987 training set. If X is trying to win, then I think it that it should make its first move in a corner. And since there is only one canonical board for X first move in corner, the recursive descent tree is much smaller.
+
+First, check that X first move should be a corner from game theory literature, then add that constraint to the generator and see how many boards are then in the training set.

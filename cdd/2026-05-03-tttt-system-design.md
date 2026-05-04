@@ -2,7 +2,7 @@
 date: 2026-05-03
 title: tttt system design
 current_head: 8f734fa
-agent: "Claude Haiku 4.5"
+agent: "Claude Sonnet 4.6"
 session_type: exploration
 topics: [system-design, architecture, tttt, planning]
 ---
@@ -200,3 +200,130 @@ The three first-move positions are verified correct: corner (`..x......` canonic
 ## Blocker
 
 `scikit-learn` cannot be loaded on this machine — every sklearn `.so` fails with `mmap(size=...) failed with errno=1` (permission denied for executable mappings). This affects all versions tested (1.5.2, 1.8.0), clean venvs, and paths outside the project directory. `numpy` and `pyyaml` load fine. The failure is a system-level restriction on `PROT_EXEC` mmap for unsigned or ad-hoc–signed binaries (codesign shows `flags=adhoc,linker-signed` on the sklearn `.so` files). This is likely a macOS security policy or Endpoint Security configuration. **Next step:** run `uv run python train.py && uv run python evaluate.py` on a machine without this restriction.
+
+# prompt 3: recursive descent board generation
+
+I have doubts that the algorithm is indeed finding only canonical board positions. I think a recursive decent generation of all possible boards would be a better approach and for each board, generating all transformations and finding the lexicographically *greatest* would be an effective brute-force solution.
+
+# Response 3: recursive descent + max-canonical; same 292 positions; first-move representatives corrected
+
+Two changes were made to `board.py`:
+
+1. **`canonical()` now picks the lexicographically *greatest* symmetry variant** (`max` instead of `min`). Both are valid canonicalization schemes; max is slightly more natural because the piece with the highest value (`O=2`) gets pushed to early cells in the representative.
+
+2. **`generate_o_to_move()` replaced with recursive game-tree descent.** The old approach enumerated all 3⁹ = 19 683 cell combinations and filtered by piece counts — it implicitly relied on the filter being correct to exclude unreachable boards. The new approach descends the actual game tree from the empty board, placing X and O alternately, and collects each "O to move" position as it is first reached:
+
+```python
+def generate_o_to_move() -> list[np.ndarray]:
+    seen: set[tuple] = set()
+    results: list[np.ndarray] = []
+
+    def recurse(board: np.ndarray, x_to_move: bool) -> None:
+        if x_to_move:
+            for move in np.where(board == EMPTY)[0]:
+                board[move] = X
+                if not is_won(board, X):
+                    c, _ = canonical(board)
+                    key = tuple(c)
+                    if key not in seen:
+                        seen.add(key)
+                        results.append(c)
+                    recurse(board, x_to_move=False)
+                board[move] = EMPTY
+        else:
+            for move in np.where(board == EMPTY)[0]:
+                board[move] = O
+                if not is_won(board, O):
+                    recurse(board, x_to_move=True)
+                board[move] = EMPTY
+
+    recurse(empty_board(), x_to_move=True)
+    return results
+```
+
+Only reachable boards are ever generated. Canonicalization and the `seen` set deduplicate across the D4 orbit. The recursion terminates when a win is detected or no empty cells remain.
+
+## Results
+
+The count is unchanged — **292 canonical positions** — confirming the old enumeration was accidentally correct even if the method was fragile. The canonical *representatives* changed because max ≠ min:
+
+```
+First-move canonical positions (3 expected: 3):
+  .../.x./...   ← center  (X at cell 4)
+  .x./.../...   ← edge    (X at cell 1)
+  x../.../...   ← corner  (X at cell 0)
+```
+
+The old min-canonical output listed `.....x...` as "center", but that is actually the *edge* canonical form (X at cell 5); the true center cell 4 gives `....x....` under both schemes. The new output correctly labels all three. `data/training.yaml` has been regenerated with the max-canonical representatives.
+
+# prompt 4: exploring differences between training sets
+
+I am puzzled that you've generated about 10 times the number of canonical boards that I did in 1987. I think you need to prune the tree after the game has been won. That is if X or O has already made a winning move then no further moves should be generated.
+
+First, check whether my conjecture is true. If it is false, speculate on how I could have had so few positions in my old training set. If it is true, add the pruning to prevent impossible board states.
+
+Second, change the output format to tab separated values which should remove repetitive clutter from the output. While you are at it, also generate the test dataset which should include all valid boards that are not canonical.
+
+Finally, create a TSV to HTML converter that displays a dataset as 3 by 3 matrices which show the input as lower case and the best move as a capital O. In the case where the board is full, coded as best move == -1, add a background to that board to show that there is no move available.
+
+# Response 4: conjecture false; TSV output; 1821-record test set; HTML visualizer
+
+## Pruning conjecture: false
+
+The current `generate_o_to_move()` already prunes correctly. Verification:
+
+```
+Total positions:            292
+Positions where X won:        0
+Positions where O won:        0
+Full boards (draw, no move):  3
+```
+
+The recursive descent checks `is_won` immediately after each placement and never adds a position or recurses further once a win is detected. The three full-board positions are legitimate: X filled the last cell, didn't win, and it is now O's turn with nowhere to move — best_move=-1 (draw). These are reachable game states.
+
+**Why only ~18 canonical states in 1987?** The README says "I hand coded O's best move." That training set was *curated*, not exhaustive. Only the strategically interesting decision points were included — likely the positions where O's choice between multiple empty cells actually matters. The exhaustive canonical set has 292 positions, most of which are late-game near-terminal states with an obvious single response. A hand-crafted set of ~18–20 positions could cover the key forks and traps while skipping the trivial endgame.
+
+## Output format: TSV
+
+`data/training.yaml` replaced by `data/training.tsv` (292 rows + header):
+
+```
+board	best_move
+....x....	0
+...
+```
+
+`train.py` and `evaluate.py` updated to use `csv.DictReader` with `delimiter="\t"`. `train.py` also filters out the 3 full-board draw records (best_move=-1) so `to_target` is never called with -1.
+
+## Test dataset: 1821 non-canonical positions
+
+`data/test.tsv` contains all 1821 valid O-to-move board positions that are not canonical representatives. Generated by applying the 7 non-identity D4 symmetry permutations to each canonical board and keeping variants not already seen:
+
+```python
+for j in range(1, 8):
+    perm = SYMMETRIES[j]
+    v_str = board_to_str(c_board[perm])
+    if v_str in seen:
+        continue
+    seen.add(v_str)
+    v_move = -1 if c_move < 0 else int(np.argsort(perm)[c_move])
+    test.append({"board": v_str, "best_move": v_move})
+```
+
+The best move for each variant is derived via the inverse permutation: if `V = C[perm]` then cell `i` of V corresponds to cell `perm[i]` of C, so the canonical best move `m` maps to cell `argsort(perm)[m]` on V. Validation against minimax confirmed 0 score-level errors — the 556 cases where the mapped move differs from minimax's choice are all tie-breaks among equally optimal moves.
+
+292 canonical + 1821 non-canonical = **2113 total reachable O-to-move positions**.
+
+## HTML visualizer: `visualize.py`
+
+```
+uv run python visualize.py data/training.tsv > data/training.html
+uv run python visualize.py data/test.tsv     > data/test.html
+```
+
+Each board renders as a 3×3 HTML table:
+- Existing `x` pieces: blue lowercase
+- Existing `o` pieces: grey lowercase
+- Best move cell: red capital **O**
+- Empty cells: a middle-dot placeholder
+- Full-board positions (best_move=-1): grey table background
