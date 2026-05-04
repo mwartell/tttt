@@ -105,24 +105,36 @@ def minimax(board: np.ndarray, x_to_move: bool) -> tuple[int, int]:
     return best_score, best_move
 
 
+CORNERS = np.array([0, 2, 6, 8], dtype=np.intp)
+
+
 def generate_o_to_move() -> list[np.ndarray]:
     """All distinct canonical non-terminal boards where O moves next,
-    found via recursive game-tree descent from the empty board."""
+    reachable when X always plays its single minimax-best move.
+
+    X's first move is cell 0 (canonical corner representative).
+    All subsequent X moves use the single minimax-best move.
+    O explores all legal responses."""
     seen: set[tuple] = set()
     results: list[np.ndarray] = []
 
     def recurse(board: np.ndarray, x_to_move: bool) -> None:
         if x_to_move:
-            for move in np.where(board == EMPTY)[0]:
-                board[move] = X
-                if not is_won(board, X):
-                    c, _ = canonical(board)
-                    key = tuple(c)
-                    if key not in seen:
-                        seen.add(key)
-                        results.append(c)
-                    recurse(board, x_to_move=False)
-                board[move] = EMPTY
+            if not np.any(board == X):
+                move = 0  # canonical corner representative
+            else:
+                _, move = minimax(board.copy(), x_to_move=True)
+                if move < 0:
+                    return  # terminal
+            board[move] = X
+            if not is_won(board, X):
+                c, _ = canonical(board)
+                key = tuple(c)
+                if key not in seen:
+                    seen.add(key)
+                    results.append(c)
+                recurse(board, x_to_move=False)
+            board[move] = EMPTY
         else:
             for move in np.where(board == EMPTY)[0]:
                 board[move] = O

@@ -68,16 +68,16 @@ def main() -> None:
         records = list(csv.DictReader(fh, delimiter="\t"))
 
     title = path
-    print(f"<!DOCTYPE html>")
-    print(f"<html>")
+    print("<!DOCTYPE html>")
+    print("<html>")
     print(f"<head><meta charset='utf-8'><title>{title}</title>")
     print(f"<style>{CSS}</style>")
-    print(f"</head>")
-    print(f"<body>")
+    print("</head>")
+    print("<body>")
     for r in records:
         print(board_html(r["board"], int(r["best_move"])), end="")
-    print(f"</body>")
-    print(f"</html>")
+    print("</body>")
+    print("</html>")
 
 
 if __name__ == "__main__":

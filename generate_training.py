@@ -53,7 +53,7 @@ def main() -> None:
     print(f"  {len(positions)} canonical positions found")
 
     first_move = [p for p in positions if list(p).count(X) == 1]
-    print(f"\nFirst-move canonical positions ({len(first_move)} expected: 3):")
+    print(f"\nFirst-move canonical positions ({len(first_move)} expected: 1):")
     for b in sorted(first_move, key=lambda b: tuple(b)):
         print(f"  {display(board_to_str(b))}")
 

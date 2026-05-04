@@ -1,8 +1,9 @@
-"""Evaluate the trained tttt model against the training set.
+"""Evaluate the trained tttt model against the training or test set.
 
-Run with:  uv run python evaluate.py
+Run with:  uv run python evaluate.py [-train | -test]
 """
 
+import argparse
 import csv
 
 import joblib
@@ -10,7 +11,6 @@ import numpy as np
 
 from board import O, str_to_board, to_features
 
-DATA_FILE = "data/training.tsv"
 MODEL_FILE = "data/model.joblib"
 
 
@@ -26,10 +26,18 @@ def decode_move(output_vec: np.ndarray, piece: np.int8 = O) -> int:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Evaluate the trained tttt model.")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("-train", action="store_true", help="Evaluate on training set (default)")
+    group.add_argument("-test", action="store_true", help="Evaluate on test set")
+    args = parser.parse_args()
+
+    data_file = "data/test.tsv" if args.test else "data/training.tsv"
     model = joblib.load(MODEL_FILE)
     print(f"Loaded model from {MODEL_FILE}")
+    print(f"Evaluating on {data_file}")
 
-    with open(DATA_FILE, newline="") as fh:
+    with open(data_file, newline="") as fh:
         records = [
             {"board": r["board"], "best_move": int(r["best_move"])}
             for r in csv.DictReader(fh, delimiter="\t")
